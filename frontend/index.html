@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ML Explorer — Interactive Machine Learning Model Explorer</title>
+  <meta name="description" content="Upload datasets, train ML models, compare performance, and explore SHAP explanations — all in your browser.">
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- LOADING OVERLAY -->
+  <div class="loading-overlay" id="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loading-text">Processing...</div>
+    <div class="loading-sub" id="loading-sub">This may take a moment</div>
+    <div class="train-progress" id="train-progress" style="display:none;">
+      <div class="bar"></div>
+    </div>
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- MAIN APP -->
+  <div class="app-container">
+
+    <!-- HEADER -->
+    <header class="app-header">
+      <div class="header-badge">
+        <span class="dot"></span>
+        ML Explorer v1.0
+      </div>
+      <h1 class="app-title">ML Model Explorer</h1>
+      <p class="app-subtitle">Upload a dataset, train multiple ML models, compare performance, and explore model explanations — all from your browser.</p>
+    </header>
+
+    <!-- STEPPER -->
+    <nav class="stepper" id="stepper">
+      <div class="step-item active" data-step="1" id="step-1">
+        <div class="step-num">1</div>
+        <span class="step-label">Upload</span>
+      </div>
+      <div class="step-connector" id="conn-1"></div>
+
+      <div class="step-item" data-step="2" id="step-2">
+        <div class="step-num">2</div>
+        <span class="step-label">Explore</span>
+      </div>
+      <div class="step-connector" id="conn-2"></div>
+
+      <div class="step-item" data-step="3" id="step-3">
+        <div class="step-num">3</div>
+        <span class="step-label">Configure</span>
+      </div>
+      <div class="step-connector" id="conn-3"></div>
+
+      <div class="step-item" data-step="4" id="step-4">
+        <div class="step-num">4</div>
+        <span class="step-label">Results</span>
+      </div>
+      <div class="step-connector" id="conn-4"></div>
+
+      <div class="step-item" data-step="5" id="step-5">
+        <div class="step-num">5</div>
+        <span class="step-label">Explain</span>
+      </div>
+    </nav>
+
+    <!-- ========================================
+         STEP 1: UPLOAD
+         ======================================== -->
+    <section class="panel active" id="panel-1">
+      <h2 class="panel-title">📂 Upload Your Dataset</h2>
+      <p class="panel-desc">Upload a CSV file or select a sample dataset to get started.</p>
+
+      <div class="upload-section">
+        <!-- Drop zone -->
+        <div class="upload-zone" id="upload-zone">
+          <span class="upload-icon">📤</span>
+          <div class="upload-text">Drag & drop your CSV file here</div>
+          <div class="upload-hint">or <span class="upload-browse" id="browse-trigger">browse files</span></div>
+          <div class="upload-hint" style="margin-top:8px; font-size:0.78rem;">Max 10MB · CSV format only</div>
+          <input type="file" id="file-input" accept=".csv" style="display:none">
+        </div>
+
+        <!-- Sample datasets -->
+        <div class="sample-datasets">
+          <h3>Or try a sample dataset</h3>
+
+          <button class="sample-btn" data-sample="iris" id="sample-iris">
+            <span class="sample-icon">🌸</span>
+            <div class="sample-info">
+              <h4>Iris Flowers</h4>
+              <p>150 rows · 5 columns · Predict species</p>
+            </div>
+            <span class="sample-badge badge-classification">Classification</span>
+          </button>
+
+          <button class="sample-btn" data-sample="titanic" id="sample-titanic">
+            <span class="sample-icon">🚢</span>
+            <div class="sample-info">
+              <h4>Titanic Survival</h4>
+              <p>891 rows · 9 columns · Predict survival</p>
+            </div>
+            <span class="sample-badge badge-classification">Classification</span>
+          </button>
+
+          <button class="sample-btn" data-sample="housing" id="sample-housing">
+            <span class="sample-icon">🏠</span>
+            <div class="sample-info">
+              <h4>California Housing</h4>
+              <p>2000 rows · 9 columns · Predict house value</p>
+            </div>
+            <span class="sample-badge badge-regression">Regression</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Preview (shown after upload) -->
+      <div class="preview-container" id="preview-container" style="display:none;">
+        <div class="card" style="margin-top:30px;">
+          <div class="card-title">📋 Data Preview — <span id="file-name-display"></span> (<span id="row-count"></span> rows × <span id="col-count"></span> cols)</div>
+          <div class="data-table-wrapper" id="data-table-wrapper"></div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <div class="card-title">📊 Column Schema</div>
+          <div class="schema-grid" id="schema-grid"></div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btn-to-eda">Continue to EDA →</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================
+         STEP 2: EDA
+         ======================================== -->
+    <section class="panel" id="panel-2">
+      <h2 class="panel-title">🔍 Exploratory Data Analysis</h2>
+      <p class="panel-desc">Auto-generated insights from your dataset.</p>
+
+      <div class="eda-grid" id="eda-grid">
+        <!-- EDA charts rendered here dynamically -->
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="btn-back-1">← Back</button>
+        <button class="btn btn-primary" id="btn-to-config">Continue to Configure →</button>
+      </div>
+    </section>
+
+    <!-- ========================================
+         STEP 3: CONFIGURE
+         ======================================== -->
+    <section class="panel" id="panel-3">
+      <h2 class="panel-title">⚙️ Configure Training</h2>
+      <p class="panel-desc">Select your target variable and models to train.</p>
+
+      <div class="config-section">
+        <!-- Target selection -->
+        <div class="card">
+          <div class="card-title">🎯 Target Variable</div>
+          <label class="target-select-label">Column to predict:</label>
+          <select class="custom-select" id="target-select">
+            <option value="">Select target column...</option>
+          </select>
+
+          <div id="target-info" style="margin-top:16px; font-size:0.85rem; color: var(--text-secondary);"></div>
+
+          <div class="slider-group">
+            <label>Test/Train Split <span id="split-val">20%</span></label>
+            <input type="range" id="test-split" min="10" max="40" value="20" step="5">
+          </div>
+        </div>
+
+        <!-- Model selection -->
+        <div class="card">
+          <div class="card-title">🤖 Models to Train</div>
+          <div class="model-list" id="model-list">
+            <label class="model-checkbox">
+              <input type="checkbox" name="model" value="Logistic Regression" checked>
+              <span class="model-name">Logistic / Linear Regression</span>
+              <span class="model-desc">Baseline</span>
+            </label>
+            <label class="model-checkbox">
+              <input type="checkbox" name="model" value="Random Forest" checked>
+              <span class="model-name">Random Forest</span>
+              <span class="model-desc">Ensemble</span>
+            </label>
+            <label class="model-checkbox">
+              <input type="checkbox" name="model" value="XGBoost" checked>
+              <span class="model-name">XGBoost</span>
+              <span class="model-desc">Gradient Boost</span>
+            </label>
+            <label class="model-checkbox">
+              <input type="checkbox" name="model" value="KNN" checked>
+              <span class="model-name">K-Nearest Neighbors</span>
+              <span class="model-desc">Instance-based</span>
+            </label>
+            <label class="model-checkbox">
+              <input type="checkbox" name="model" value="SVM" checked>
+              <span class="model-name">Support Vector Machine</span>
+              <span class="model-desc">Kernel-based</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="btn-back-2">← Back</button>
+        <button class="btn btn-primary" id="btn-train" disabled>🚀 Train Models</button>
+      </div>
+    </section>
+
+    <!-- ========================================
+         STEP 4: RESULTS
+         ======================================== -->
+    <section class="panel" id="panel-4">
+      <h2 class="panel-title">📊 Training Results</h2>
+      <div class="results-header">
+        <p class="panel-desc" style="margin-bottom:0;">Model comparison and performance metrics.</p>
+        <div class="best-badge" id="best-badge" style="display:none;">
+          <span>⭐</span> Best: <span id="best-model-name">—</span>
+        </div>
+      </div>
+
+      <!-- Metric cards for best model -->
+      <div class="metrics-row" id="metrics-row"></div>
+
+      <!-- Comparison table -->
+      <div class="card" style="margin-bottom:24px;">
+        <div class="card-title">📋 Model Comparison</div>
+        <div class="comparison-table-wrapper" id="comparison-table-wrapper"></div>
+      </div>
+
+      <!-- Charts -->
+      <div class="results-charts" id="results-charts"></div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="btn-back-3">← Back</button>
+        <button class="btn btn-primary" id="btn-to-explain">View SHAP Explanations →</button>
+        <button class="btn btn-success" id="btn-download">⬇ Download Predictions</button>
+      </div>
+    </section>
+
+    <!-- ========================================
+         STEP 5: EXPLAIN
+         ======================================== -->
+    <section class="panel" id="panel-5">
+      <h2 class="panel-title">🧠 Model Explainability</h2>
+      <p class="panel-desc">SHAP-based feature importance and individual prediction explanations.</p>
+
+      <div class="shap-section" id="shap-section">
+        <!-- SHAP content rendered here -->
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="btn-back-4">← Back</button>
+        <button class="btn btn-success" id="btn-download-2">⬇ Download Predictions</button>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- API STATUS BAR -->
+  <div class="api-status">
+    <span class="status-dot" id="api-dot"></span>
+    <span id="api-status-text">Checking API...</span>
+    <span style="margin-left:auto; font-family: 'JetBrains Mono', monospace;" id="api-url-display"></span>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
